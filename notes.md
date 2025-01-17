@@ -27,6 +27,52 @@ Transformers Version:
 transformers @ git+https://github.com/huggingface/transformers@6c3f168b36882f0beebaa9121eafa1928ba29633
 
 
+#### Evaluation
+
+To use the OLMes library for evaluation, install it using the following command:
+
+```
+pip install git+https://github.com/allenai/olmes.git@38af8b61741b01faeb60e90899addd7e6fa503a0
+```
+
+You are welcome to use your own installed OLMes version as long as it is compatible with the OLMo2 architecture.
+
+I modified their VLLM implementation to use batch_size="auto" for faster evaluation compared to using Hugging Face's implementation. Below is the modification I made in OLMes/models/eleuther_vllm_causallms.py:
+I hard code their VLLM using `auto` for batch_size, so evalaution will be quite fast compred using hf. 
+Here is the modication in OLMes/models/eleuther_vllm_causallms.py
+
+
+I modified the VLLM implementation in OLMes to set batch_size="auto", enabling faster evaluation compared to the default Hugging Face implementation. The changes were made in OLMes/models/eleuther_vllm_causallms.py. Below is the updated code:
+
+```
+class VLLM_Verbose(VLLM):
+    AUTO_MODEL_CLASS = transformers.AutoModelForCausalLM  # For encode_pairs to work
+
+    def __init__(
+        self,
+        pretrained="gpt2",
+        device: Optional[str] = None,
+        **kwargs,
+    ):
+        if not find_spec("vllm"):
+            raise ModuleNotFoundError(
+                "Model type is `vllm` but `vllm` is not installed! Please install vllm via `pip install -e .[gpu]`"
+            )
+        if device is None:
+            device = "cuda" if torch.cuda.device_count() > 0 else "cpu"
+        if torch.cuda.device_count() > 1:
+            kwargs["tensor_parallel_size"] = torch.cuda.device_count()
+        
+        kwargs["batch_size"] = "auto"  # Set batch size to auto for faster evaluation
+        print("kwargs")
+
+        super().__init__(pretrained, device=device, **kwargs)
+```
+
+This adjustment ensures the evaluation process is more efficient, especially when leveraging the VLLM library.
+
+
+
 ### Save Model Checkpoints
 To save the Hugging Face (HF) checkpoint, run the following command:
 
