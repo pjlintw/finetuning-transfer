@@ -5,6 +5,7 @@ token_length.png
 *.tfevents.*
 
 oe-eval-internal/
+tools/olmes/*.tar.gz
 
 # local working dir
 __projects__llms-lab__open-instruct__output__llama-1b-ft-tulu3_math_subset_seq-2k_optim-adamw_lr-5e-6_step-5k__step_1000/
@@ -199,4 +200,5 @@ dmypy.json
 .pyre/
 
 .idea/
-.vscode
+.vscodetools/olmes/vllm.tar.gz
+tools/olmes/olmes-1208.tar.gz
