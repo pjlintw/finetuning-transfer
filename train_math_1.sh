@@ -11,41 +11,41 @@ map_training_to_filename() {
 }
 
 models=(
-    ### OLMo2 PT checkpoit ###
-    # M1
+    # md
     # "/projects/llms-lab/merged-models/hf_models/olmo-2-1124-7b-stage1-step300000-tokens1259b"
     
-    # M5
+    # # md
     # "/projects/llms-lab/merged-models/hf_models/olmo-2-1124-7b-stage2-ingredient1-step11931-tokens50b"
     
-    # M3 
+    # # if
     # "/projects/llms-lab/merged-models/hf_models/olmo-2-1124-7b-stage1-step928646-tokens3896b"
     
-    # M2 
+    # # if
     # "/projects/llms-lab/merged-models/hf_models/olmo-2-1124-7b-stage1-step600000-tokens2517b"
     
-    # M4 
+    # # llm-lab
     # "/projects/llms-lab/merged-models/hf_models/olmo-2-1124-7b-stage2-ingredient1-step6000-tokens26b"
 
-    ### Sec2. Merged model & Sec3. continually training ###
-    ###  M_j + vec( M_j-1, M_j-1) ###
+    # md
     # M2 + vec( M1-FT-30K - PT-M1 )
     # "/projects/llms-lab/merged-models/hf_models/vec-FTolmo2_math_30k-PTolmo2-stage1_300k_lambda-1_arc-PTolmo2-stage1_600k"
     
+    # md
     # M3 + vec( M2-FT-30K - PT-M2 )
     # "/projects/llms-lab/merged-models/hf_models/vec-FTolmo2_math_30k-PTolmo2-stage1_600k_lambda-1_arc-PTolmo2-stage1_928k"
     
+    # # if
     # M4 + vec( M3-FT-30K - PT-M3 )
     # "/projects/llms-lab/merged-models/hf_models/vec-FTolmo2_math_30k-PTolmo2-stage1_928k_lambda-1_arc-PTolmo2-stage2_ingredient1_6k"
     
+    # # if
     # M5 + vec( M4-FT-30K - PT-M4 )
     # "/projects/llms-lab/merged-models/hf_models/vec-FTolmo2_math_30k-PTolmo2-stage2_ingredient1_6k_lambda-1_arc-PTolmo2-stage2_ingredient1_12k"
 
-    ###  M_j + vec( M_j-2, M_j-2) ###
     # M3 + vec( M1-FT-30K - PT-M1 )
     # "/projects/llms-lab/merged-models/hf_models/vec-FTolmo2_math_30k-PTolmo2-stage1_300k_lambda-1_arc-PTolmo2-stage1_928k"
 
-    # M4 + vec( M2-FT-30K - M2 )
+    # # M4 + vec( M2-FT-30K - M2 )
     # "/projects/llms-lab/merged-models/hf_models/vec-FTolmo2_math_30k-PTolmo2-stage1_600k_lambda-1_arc-PTolmo2-stage2_ingredient1_6k"
 
     # M5 + vec( M3-FT-30K - M3 )
@@ -53,7 +53,7 @@ models=(
 
     ### merged model M_j + vec( M_j-3, M_j-3) ###
     # M4 + vec( M1-FT-30K - PT-M1 )
-    # "/projects/llms-lab/merged-models/hf_models/vec-FTolmo2_math_30k-PTolmo2-stage1_300k_lambda-1_arc-PTolmo2-stage2_ingredient1_6k"
+    "/projects/llms-lab/merged-models/hf_models/vec-FTolmo2_math_30k-PTolmo2-stage1_300k_lambda-1_arc-PTolmo2-stage2_ingredient1_6k"
         
     # M5 + vec( M2-FT-30K - PT-M2 )
     # "/projects/llms-lab/merged-models/hf_models/vec-FTolmo2_math_30k-PTolmo2-stage1_600k_lambda-1_arc-PTolmo2-stage2_ingredient1_12k"
@@ -70,13 +70,14 @@ models=(
 # `NUM_MACHINES`, `NUM_PROCESSES`, `PER_DEVICE_TRAIN_BATCH_SIZE`,
 # `GRADIENT_ACCUMULATION_STEPS` according to your setup
 dataset_name=tulu3_math
+# model_name_or_path=/projects/llms-lab/merged-models/hf_models/olmo-2-1124-7b/
 dataset_mixer_list="allenai/tulu-3-sft-personas-math 1.0 allenai/tulu-3-sft-personas-math-grade 1.0 allenai/tulu-3-sft-personas-algebra 1.0"
 wandb_entity=linus
 
 # 5e-06 2e-5 1e-5
 lr=5e-6
 train_step=30000
-seq_len=2048
+seq_len=2028
 checkpointing_steps=5000
 MACHINE_RANK=0
 MAIN_PROCESS_IP=localhost
@@ -85,7 +86,7 @@ NUM_PROCESSES=4
 PER_DEVICE_TRAIN_BATCH_SIZE=2
 GRADIENT_ACCUMULATION_STEPS=1
 main_process_port=29450 # avoide using duplicate port number
-ft_model_dir=/projects/llms-lab/open-instruct
+# I used 29400 - 29600
 
 output_dirs=()
 # for train_step in "${steps[@]}";
@@ -118,7 +119,7 @@ do
         --main_process_port $main_process_port \
         --use_deepspeed \
         --deepspeed_config_file configs/ds_configs/stage3_no_offloading_accelerate.conf \
-        --deepspeed_multinode_launcher standard open_instruct/finetune_lora.py \
+        --deepspeed_multinode_launcher standard open_instruct/finetune.py \
         --model_name_or_path $model_name_or_path \
         --tokenizer_name $model_name_or_path \
         --use_slow_tokenizer false \
@@ -155,7 +156,7 @@ done
 source ~/anaconda3/etc/profile.d/conda.sh
 conda activate olmes-1208
 
-
+ft_model_dir=/projects/llms-lab/open-instruct
 # Evaluation using olmes
 # all tulu3's tasks except for MMLU
 for model in "${output_dirs[@]}";
@@ -163,62 +164,88 @@ do
     model="${ft_model_dir}/${model}"
     eval_dir="${model}/eval_olmes"
     
-    ### Estimated time: 2 minutes ###
+    # ### debug: mmlu
+    # task=mmlu:0shot_cot::tulu3
+    # olmes \
+    # --model $model \
+    # --gpus 2 \
+    # --model-args='{"trust_remote_code": true, "add_bos_token": true, "dtype": "bfloat16"}' \
+    # --task $task \
+    
+    # --output-dir "${eval_dir}" 2>&1 | tee ${eval_dir}/eval_tulu3_suites_mmlu_cot.txt
+    # # mmlu:mc::tulu
+
     task="arc_challenge:mc::olmes"
     olmes \
     --model $model \
     --model-type hf \
-    --gpus $NUM_GPUS \
+    --gpus 2 \
     --model-args='{"trust_remote_code": false, "add_bos_token": true, "dtype": "bfloat16"}' \
     --task $task \
     --output-dir "${eval_dir}" 2>&1 | tee ${eval_dir}/eval_tulu3_suites_arc_challenge.txt
 
-
-    ### Estimated time: 2 minutes ###
     task="gsm8k::tulu"
     olmes \
     --model $model \
     --model-type vllm \
-    --gpus $NUM_GPUS \
+    --gpus 2 \
     --model-args='{"trust_remote_code": true, "add_bos_token": true, "dtype": "bfloat16"}' \
     --task $task \
-    --output-dir "${eval_dir}" 2>&1 | tee ${eval_dir}/eval_tulu3_suites_gsm8k_math.txt
+    --output-dir "${eval_dir}" 2>&1 | tee ${eval_dir}/eval_tulu3_suites_gsm8k.txt
 
-
-    # # # ### Estimated time: 21 minutes ###
     # task="minerva_math::tulu"
     # olmes \
     # --model $model \
     # --model-type vllm \
-    # --gpus $NUM_GPUS \
+    # --gpus 2 \
     # --model-args='{"trust_remote_code": true, "add_bos_token": true, "dtype": "bfloat16"}' \
     # --task $task \
     # --output-dir "${eval_dir}" 2>&1 | tee ${eval_dir}/eval_tulu3_suites_math.txt
 
-
-    # # ### Estimated time: 2 mins / 2 mins ###
     # task="ifeval::tulu gpqa:0shot_cot::tulu3"
     # olmes \
     # --model $model \
     # --model-type vllm \
-    # --gpus $NUM_GPUS \
+    # --gpus 2 \
     # --model-args='{"trust_remote_code": true, "add_bos_token": true, "dtype": "bfloat16", "max_length": 4096}' \
     # --task $task \
     # --output-dir "${eval_dir}" 2>&1 | tee ${eval_dir}/eval_tulu3_suites_ifeval_gpqa.txt
     
-
-    # ### Estimated time: 12 minutes ###
-    task="drop::olmes"
+    task="drop::llama3"
     olmes \
     --model $model \
     --model-type vllm \
-    --gpus $NUM_GPUS \
+    --gpus 2 \
     --model-args='{"trust_remote_code": true, "add_bos_token": true, "dtype": "bfloat16"}' \
     --task $task \
     --output-dir "${eval_dir}" 2>&1 | tee ${eval_dir}/eval_tulu3_suites_drop.txt
+done
 
 
-    # ### Estimated time: 1 minutes ###
+# # MMLU
+# unset PYTORCH_CUDA_ALLOC_CONF
+# export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False
+
+# for model in "${output_dirs[@]}"; 
+# do
+#     eval_dir="${model}/eval_olmes"
+    
+#     ### debug: mmlu
+#     task=mmlu:0shot_cot::tulu3
+#     olmes \
+#     --model $model \
+#     --gpus 4 \
+#     --model-args='{"trust_remote_code": true, "add_bos_token": true, "dtype": "bfloat16"}' \
+#     --task $task \
+#     --output-dir "${eval_dir}" 2>&1 | tee ${eval_dir}/eval_tulu3_suites_mmlu_cot.txt
+#     # mmlu:mc::tulu
+# done
+
+
+for model in "${output_dirs[@]}";
+do
+    eval_dir="${model}/eval_olmes"
+
     task="naturalqs::olmes"
     olmes \
     --model $model \
@@ -230,23 +257,9 @@ do
 done
 
 
-# # MMLU
-# unset PYTORCH_CUDA_ALLOC_CONF
-# export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False
 
-# for model in "${output_dirs[@]}"; 
-# do
-#     eval_dir="${model}/eval_olmes"
-#     ### Estimated time: 23 hours ###
-#     ### debug: mmlu
-#     task=mmlu:0shot_cot::tulu3
-#     olmes \
-#     --model $model \
-#     --gpus 4 \
-#     --model-args='{"trust_remote_code": true, "add_bos_token": true, "dtype": "bfloat16"}' \
-#     --task $task \
-#     --output-dir "${eval_dir}" 2>&1 | tee ${eval_dir}/eval_tulu3_suites_mmlu_cot.txt
-#     # mmlu:mc::tulu
-# done
+
+
+
 
 

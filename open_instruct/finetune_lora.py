@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import partial
 from typing import List, Optional, Union
+import numpy as np
 
 import datasets
 import deepspeed
@@ -66,6 +67,23 @@ from open_instruct.utils import (
     maybe_use_ai2_wandb_entity,
     upload_metadata_to_hf,
 )
+
+
+def initialize_weights(module, seed=123):
+    
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    
+    if hasattr(module, 'weight') and module.weight is not None:
+        # Check if the weight tensor has at least 2 dimensions
+        if module.weight.dim() >= 2:
+            torch.nn.init.xavier_uniform_(module.weight)  # Initialize weights
+        else:
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)  # For 1D weights
+    if hasattr(module, 'bias') and module.bias is not None:
+        torch.nn.init.zeros_(module.bias)
 
 logger = get_logger(__name__)
 
@@ -732,12 +750,6 @@ def main(args: FlatArguments):
     elif args.gradient_checkpointing:
         model.gradient_checkpointing_enable()
 
-
-    # Re-initialize
-    if args.reset_weights:
-        logger.info("***** Reset model weights *****")
-        model.init_weights()
-
     train_dataset = raw_datasets["train"]
     # debugging tool for fewer samples
     if args.max_train_samples is not None:
@@ -835,10 +847,41 @@ def main(args: FlatArguments):
         num_training_steps=num_training_steps_for_scheduler,
         num_warmup_steps=int(num_training_steps_for_scheduler * args.warmup_ratio),
     )
+
+    # re-initialized model
+    if args.reset_weights:
+        logger.info("***** Reset model weights *****")
+        model.apply(initialize_weights)
+        accelerator.wait_for_everyone()
+        
+        # Check if distributed training is enabled
+        if torch.cuda.device_count() > 1 and torch.distributed.is_available():
+            if torch.distributed.is_initialized() and torch.distributed.get_world_size() > 1:
+                for param in model.state_dict().values():
+                    torch.distributed.broadcast(param, src=0)
+            accelerator.wait_for_everyone()
+
+
     # Prepare everything with `accelerator`.
     model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         model, optimizer, train_dataloader, lr_scheduler
     )
+
+    # Save the re-initialized model
+    if args.reset_weights:
+        # TODO: Correct the `save_init_path` when wrapping up code
+        # Save the model and tokenizer to the specified directory
+        save_init_path="/projects/llms-lab/merged-models/hf_models/olmo-2-1124-7b-init"
+        save_with_accelerate(
+            accelerator,
+            model,
+            tokenizer,
+            save_init_path,
+            args.use_lora,
+        )
+        logger.info(f"Model and tokenizer downloaded to: {save_init_path}")
+        # print(f"Model and tokenizer downloaded to: {save_init_path}")
+        
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)

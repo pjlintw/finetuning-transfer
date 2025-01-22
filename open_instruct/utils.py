@@ -287,6 +287,36 @@ def get_datasets(
                         print(dataset.column_names)
                         print(len(dataset))
 
+                    elif "izumi-lab/llm-japanese-dataset-vanilla" in ds:
+                        def combine_columns(example):
+                            example['inputs'] = f"{example['instruction']}\n{example['input']}"
+                            example['targets'] = example['output']
+                            return example
+
+                        dataset = load_dataset('izumi-lab/llm-japanese-dataset-vanilla', split='train')
+                        dataset = dataset.map(combine_columns).remove_columns("instruction").remove_columns("input").remove_columns("output")
+                        # dataset = dataset.rename_column("output", "target")
+                        print(dataset.column_names)
+                        print(len(dataset))
+
+                    elif "iknow-lab/ko-evol-writing-wiki" in ds:
+                        def combine_columns(example):
+                            example['inputs'] = f"{example['instruction']}\n{example['input']}"
+                            example['targets'] = example['output']
+                            return example
+                        
+                        dataset = load_dataset('iknow-lab/ko-evol-writing-wiki', split='train')
+                        dataset = dataset.map(combine_columns).remove_columns("category").remove_columns("input").remove_columns("output").remove_columns("instruction")
+                        print(dataset.column_names)
+                        print(len(dataset))
+
+                    elif "turkish-nlp-suite/InstrucTurca" in ds:
+                        dataset = load_dataset('turkish-nlp-suite/InstrucTurca', split='train')
+                        dataset = dataset.rename_column("Output", "targets")
+                        dataset = dataset.rename_column("Input", "inputs")
+                        print(dataset.column_names)
+                        print(len(dataset))
+
                     else:
                         # Try first if dataset on a Hub repo
                         dataset = load_dataset(ds, ds_config, split=split)
