@@ -52,6 +52,93 @@ https://github.com/allenai/open-instruct/blob/98ccfb460ae4fb98140783b6cf54241926
 Commented out Args not currently used
 """
 
+# we create 
+DATASET_PROCESSING_FUNCTIONS = {
+    "allenai/tulu-v2-sft-mixture": "process_tulu_v2",
+    "GAIR/lima": "process_lima",
+    "allenai/tulu-3-sft-mixture": "process_tulu_3_math",
+    "GAIR/LIMO": "process_limo",
+    # Add other dataset mappings here
+    # "dataset_name": "function_name",
+}
+
+# Define the function for TULU-V3 filtering
+def process_tulu_3_math(dataset):
+    """
+    Filter the Tulu-3-sft-mixture dataset to include only specific subsets.
+    """
+    allowed_types = {
+        "ai2-adapt-dev/personahub_math_v5_regen_149960",
+        "ai2-adapt-dev/numinamath_tir_math_decontaminated",
+        "ai2-adapt-dev/tulu_v3.9_open_math_2_gsm8k_50k",
+        "allenai/tulu-3-sft-personas-math-grade",
+        "ai2-adapt-dev/tulu_v3.9_personahub_math_interm_algebra_20k"
+    }
+        
+    # Use filter to apply the filtering logic
+    return dataset.filter(
+        lambda example: (
+            example['source'] in allowed_types
+        ),
+        num_proc=10
+    )
+
+# Define the function for TULU-V2 filtering
+def process_tulu_v2(dataset):
+    """
+    Filter the TULU-V2 dataset to include only specific subsets.
+    """
+    allowed_types = ['flan_v2', 'oasst1'] # 50k, 7k
+    # science_prefix = 'science.'
+
+    # Use filter to apply the filtering logic
+    return dataset.filter(
+        lambda example: (
+            example['dataset'] in allowed_types
+            
+            # example['dataset'] in allowed_types or
+            # example['dataset'].startswith(science_prefix)
+        ),
+        num_proc=10
+    )
+
+# Preprocessing function for LIMA
+def process_lima(dataset):
+    """
+    Convert Lima conversations into a structured message format.
+    """
+    def preprocess_example(example):
+        # Convert conversations to user-assistant message pairs
+        messages = []
+        for i, content in enumerate(example["conversations"]):
+            role = "user" if i % 2 == 0 else "assistant"
+            messages.append({"role": role, "content": content})
+        example["messages"] = messages
+        return example
+
+    # Apply the preprocessing logic
+    return dataset.map(preprocess_example, num_proc=10)
+
+
+
+# Preprocessing function for LIMO
+def process_limo(dataset):
+    """
+    Convert Limo conversations into a structured message format.
+    """
+    def preprocess_example(example):
+        # Convert conversations to user-assistant message pairs
+        messages = [
+            {"role": "user", "content": example["question"]},
+            {"role": "assistant", "content": example["solution"]},
+        ]
+        example["messages"] = messages
+        return example
+
+    # Apply the preprocessing logic
+    return dataset.map(preprocess_example, num_proc=10)
+
+
 
 # ----------------------------------------------------------------------------
 # Dataset utilities
@@ -168,6 +255,16 @@ def convert_rejection_samples_to_messages(example):
     Convert a rejection sampling dataset to messages.
     """
     example["messages"] = example["chosen"]
+    return example
+
+
+def convert_condor_sft_20k_to_messages(example):
+    # example["prompt"] 與 example["prediction"] 各是一個字串
+    messages = [
+        {"role": "user", "content": example["prompt"]},
+        {"role": "assistant", "content": example["prediction"]},
+    ]
+    example["messages"] = messages
     return example
 
 
@@ -320,10 +417,44 @@ def get_datasets(
                     else:
                         # Try first if dataset on a Hub repo
                         dataset = load_dataset(ds, ds_config, split=split)
+
+                    ### Pin-Jie instruction following ###
+                    # if ds == "flan-v2":
+                    #     dataset = load_dataset("allenai/tulu-v2-sft-mixture", ds_config, split=split)
+
+                    #     # Define the function for TULU-V2 filtering
+                    #     def process_flan_v2(dataset):
+                    #         allowed_types = ['flan_v2'] # 50k, 7k
+                    #         return dataset.filter(
+                    #             lambda example: (example['dataset'] in allowed_types),
+                    #             num_proc=10
+                    #         )
+                    #     dataset = process_flan_v2(dataset)
+                    #     print("data", dataset)
+
+                    # else:
+                    #     # Try first if dataset on a Hub repo
+                    #     dataset = load_dataset(ds, ds_config, split=split)
+
+                    ### Pin-Jie instruction following ###                
                 except DatasetGenerationError:
                     # If not, check local dataset
                     dataset = load_from_disk(os.path.join(ds, split))
 
+
+            # handling external datasets
+            # Check if a processing function is mapped for this dataset
+            processing_function_name = DATASET_PROCESSING_FUNCTIONS.get(ds)
+            if processing_function_name:
+                processing_function = globals().get(processing_function_name)
+                if callable(processing_function):
+                    dataset = processing_function(dataset)
+                    print("data", dataset)
+            # test #
+            for exm in dataset:
+                print(exm["messages"])
+                break
+            
             # shuffle dataset if set
             if shuffle:
                 dataset = dataset.shuffle(seed=42)
@@ -374,6 +505,15 @@ def get_datasets(
                 and "messages" not in dataset.column_names
             ):
                 dataset = dataset.map(convert_rejection_samples_to_messages, num_proc=10)
+            elif (
+                "prompt" in dataset.column_names
+                and "prediction" in dataset.column_names
+                and "messages" not in dataset.column_names
+            ):
+                dataset = dataset.map(
+                    convert_condor_sft_20k_to_messages,
+                    num_proc=10,
+                )
 
             # if id not in dataset, create it as ds-{index}
             if "id" not in dataset.column_names:
@@ -384,7 +524,10 @@ def get_datasets(
             dataset = dataset.remove_columns(
                 [col for col in dataset.column_names if col not in (columns_to_keep + ["id"])]
             )
-
+            # test #
+            print("dataset after removed")
+            print(dataset)
+            
             # if add_source_col, add that column
             if add_source_col:
                 source_col = [ds] * len(dataset)
@@ -461,6 +604,11 @@ def get_datasets(
         if len(raw_val_datasets) > 0:
             if "id" in raw_datasets["test"].column_names:
                 raw_datasets["test"] = raw_datasets["test"].remove_columns("id")
+    # test #
+    print("idx ", raw_datasets)
+    for exm in raw_datasets["train"]:
+        print(exm["messages"])
+        break
 
     return raw_datasets
 

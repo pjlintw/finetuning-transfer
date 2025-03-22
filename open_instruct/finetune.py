@@ -69,6 +69,9 @@ from open_instruct.utils import (
 )
 
 
+from torch.distributed.elastic.multiprocessing.errors import record
+
+
 def initialize_weights(module, seed=123):
     
     torch.manual_seed(seed)
@@ -86,6 +89,14 @@ def initialize_weights(module, seed=123):
         torch.nn.init.zeros_(module.bias)
 
 logger = get_logger(__name__)
+
+
+class FastDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
+    def __call__(self, features, return_tensors=None):
+        batch = super().__call__(features, return_tensors)
+        if "labels" in batch:
+            batch["labels"] = torch.tensor(np.array(batch["labels"]), dtype=torch.int64)
+        return batch
 
 
 @dataclass
@@ -361,7 +372,11 @@ class FlatArguments:
         metadata={"help": "Re-initializes model."},
     )
 
-
+    explicit_checkpoint_steps: Optional[str] = field(
+        default="",
+        metadata={"help": "Comma-separated explicit checkpoint steps, e.g., '100,500,10000'"},
+    )
+    
     push_to_hub: bool = True
     """Whether to upload the saved model to huggingface"""
     hf_entity: Optional[str] = None
@@ -402,6 +417,13 @@ class FlatArguments:
             raise ValueError("Cannot provide two dataset selection mechanisms.")
         if self.try_launch_beaker_eval_jobs and not self.push_to_hub:
             raise ValueError("Cannot launch Beaker evaluation jobs without pushing to the Hub.")
+
+
+        if self.explicit_checkpoint_steps:
+            self.explicit_checkpoint_steps = set(map(int, self.explicit_checkpoint_steps.split(",")))
+        else:
+            self.explicit_checkpoint_steps = set()
+
 
 
 def encode_sft_example(example, tokenizer, max_seq_length):
@@ -476,7 +498,7 @@ def encode_sft_example(example, tokenizer, max_seq_length):
         "attention_mask": attention_mask.flatten(),
     }
 
-
+@record
 def main(args: FlatArguments):
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
     # If we're using tracking, we also need to initialize it here and it will by default pick up all supported trackers
@@ -593,7 +615,8 @@ def main(args: FlatArguments):
         raise ValueError(
             "You are instantiating a new config instance from scratch. This is not supported by this script."
         )
-
+    # test #
+    print("checkpoint 1")
     tokenizer_revision = args.model_revision if args.tokenizer_revision is None else args.tokenizer_revision
     if tokenizer_revision != args.model_revision:
         # Warn user if tokenizer and model use different revisions; this is an unusual
@@ -604,7 +627,7 @@ def main(args: FlatArguments):
 
     if args.tokenizer_name:
         print("use old")
-        print(args.tokenizer_name)
+        print("tokenizer_name: ", args.tokenizer_name)
         tokenizer = AutoTokenizer.from_pretrained(
             args.tokenizer_name,
             revision=tokenizer_revision,
@@ -660,6 +683,15 @@ def main(args: FlatArguments):
         logger.info("Training new model from scratch")
         model = AutoModelForCausalLM.from_config(config)
 
+    # # check if flash attention enable    
+    try:
+        dummy_qkv = torch.randn(1, 32, 128, device="cuda", dtype=torch.bfloat16)
+        flash_attn_qkvpacked_func(dummy_qkv, causal=True)
+        logger.info("✅ Flash Attention is working correctly!")
+    except Exception as e:
+        logger.warning(f"❌ Flash Attention may not be functioning properly: {e}")
+
+        
     # no default pad token for llama!
     # here we add all special tokens again, because the default ones are not in the special_tokens_map
     if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, LlamaTokenizerFast):
@@ -767,6 +799,10 @@ def main(args: FlatArguments):
     # with accelerator.main_process_first():
     #     train_dataset = train_dataset.filter(lambda example: filter_dataset(example, max_length=args.max_seq_length))
     # print(train_dataset)
+    # test #
+    for exm in train_dataset:
+        print(exm["messages"])
+        break
 
     with accelerator.main_process_first():
         train_dataset = train_dataset.map(
@@ -780,11 +816,18 @@ def main(args: FlatArguments):
             desc="Tokenizing and reformatting instruction data",
         )
         train_dataset.set_format(type="pt")
+        # test #
+        print(train_dataset)
         train_dataset = train_dataset.filter(lambda example: (example["labels"] != -100).any())
+    # test #
+    print("train_dataset", train_dataset)
 
     # Log a few random samples from the training set:
     for index in random.sample(range(len(train_dataset)), 3):
         logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+    # test #
+    print("train_dataset", train_dataset)
+    assert 3==2
 
     # DataLoaders creation:
     train_dataloader = DataLoader(
@@ -793,6 +836,19 @@ def main(args: FlatArguments):
         collate_fn=DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, padding="longest"),
         batch_size=args.per_device_train_batch_size,
     )
+     
+
+    # train_dataloader = DataLoader(
+    #     train_dataset,
+    #     shuffle=True,
+    #     collate_fn=FastDataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, padding="longest"),
+    #     batch_size=args.per_device_train_batch_size,
+    #     pin_memory=True,
+    #     num_workers=min(args.preprocessing_num_workers, 16),
+    # )
+
+
+
 
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.
@@ -882,7 +938,6 @@ def main(args: FlatArguments):
         logger.info(f"Model and tokenizer downloaded to: {save_init_path}")
         # print(f"Model and tokenizer downloaded to: {save_init_path}")
         
-
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     if overrode_max_train_steps:
@@ -895,6 +950,9 @@ def main(args: FlatArguments):
     if checkpointing_steps is not None and str(checkpointing_steps).lower() != "epoch":
         checkpointing_steps = int(checkpointing_steps)
 
+    # set up explicit_checkpoint_steps
+    explicit_checkpoint_steps = args.explicit_checkpoint_steps
+    
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
     if args.with_tracking:
@@ -937,6 +995,7 @@ def main(args: FlatArguments):
 
     # Potentially load in the weights and states from a previous save
     last_checkpoint_path = get_last_checkpoint_path(args)
+    print("last_checkpoint_path", last_checkpoint_path)
     if last_checkpoint_path:
         accelerator.print(f"Resumed from checkpoint: {last_checkpoint_path}")
         accelerator.load_state(last_checkpoint_path)
@@ -1062,12 +1121,12 @@ def main(args: FlatArguments):
                     total_aux_loss = 0
 
                 if isinstance(checkpointing_steps, int):
-                    if completed_steps % checkpointing_steps == 0:
+                    should_save_checkpoint = (completed_steps % checkpointing_steps == 0) or (completed_steps in explicit_checkpoint_steps)
+
+                    if should_save_checkpoint:
                         output_dir = f"step_{completed_steps}"
                         if args.output_dir is not None:
                             output_dir = os.path.join(args.output_dir, output_dir)
-                        
-                        # accelerator.save_state(output_dir)
                         
                         save_with_accelerate(
                             accelerator,
@@ -1076,13 +1135,6 @@ def main(args: FlatArguments):
                             output_dir,
                             args.use_lora,
                         )
-                        # # To save conventional checkpoint
-                        # if accelerator.is_main_process:
-                        #     # Save the fine-tuned model locally
-                        #     model.save_pretrained(output_dir)
-                        #     tokenizer.save_pretrained(output_dir)
-                        #     print("Fine-tuning model complete. Model checkpoint saved.")
-
 
                         # use this to mark the checkpoint as completely saved, to avoid restoring from garbled checkpoints
                         with open(

@@ -3,6 +3,7 @@ import torch
 import argparse
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+
 def download_and_save_model(model_name, tokenizer_name, output_dir, torch_dtype=None, device_map=None, attn_implementation=None, revision=None):
     # Download and save the model
     model = AutoModelForCausalLM.from_pretrained(
