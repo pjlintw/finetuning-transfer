@@ -11,7 +11,7 @@
 
 - 2025.03: We released the paper and code.
 
-This repository accompanies the paper ["Efficient Model Development through Fine-tuning Transfer"](https://arxiv.org/abs/2501.19393), providing code for all the results.
+This repository accompanies the paper (TBA), providing code for all the results.
 
 - [Quick Start](#quick-start)
 - [Transfer Fine-tuning](#transfer-fine-tuning)
