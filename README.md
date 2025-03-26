@@ -49,15 +49,12 @@ pip install git+https://github.com/huggingface/transformers@6c3f168b36882f0beeba
 
 ## Transfer Fine-tuning
 
-Yu can transfer fine-tuning updates using only open-weight models (see Section 1 of our paper) or specific fine-tuned models (see Section 4).
-For example, get the diff between LLaMA 3.0 Instruct and LLaMA 3.0, then apply it to LLaMA 3.1.
-Or reuse updates from your fine-tuned OLMo 2 model on another base model—no retraining needed.
-
-
+You can transfer fine-tuning updates using only open-weight models (see Section 1 of our paper) or specific fine-tuned models (see Section 4). 
+For example, get the diff between Llama 3.0 Instruct and Llama 3.0, then apply it to Llama 3.1. Or reuse updates from your fine-tuned OLMo 2 model on another base model—no retraining needed.
 
 ### Recycling for Merged Model
 
-Results using diff vectors on LLaMA models. For example, Δ₃.₀ is the weight changes between Llama 3.0 Instruct and Llama 3.0.
+Results using diff vectors on Llama models. For example, Δ₃.₀ is the weight changes between Llama 3.0 Instruct and Llama 3.0.
 
 
 | Model                  | GSM8K | MATH | ARC_C | GPQA | MMLU | IFEval |
@@ -79,7 +76,7 @@ cd tools
 python run_transfer_finetuning.py
 ```
 
-You can work this with open-weight models like LLaMA or Tüulu 3—but no need to do fine-tuning by yourself.
+You can work this with open-weight models like Llama or Tülu 3—but no need to do fine-tuning by yourself.
 
 
 ### Training
@@ -120,7 +117,7 @@ cd tools/olmes
 bash eval_it_olmo2.sh
 ```
 
-Note: we're working to release LLaMA 3 and 3.1 evaluations
+Note: we're working to release Llama 3 and 3.1 evaluations
 
 
 
