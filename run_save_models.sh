@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Directory to save downloaded models
-SAVE_DIR="/projects/llms-lab/merged-models/hf_models"
+SAVE_DIR="/path/to/merged-models/hf_models"
 
 # Define the list of models to download
 
@@ -32,6 +32,8 @@ OLMO_MODELS=(
     # "allenai/OLMo-2-1124-7B-sft"
     # "allenai/OLMo-2-1124-7B-dpo"
     # "allenai/OLMo-2-1124-7B-instruct"
+    # "meta-llama/Llama-2-7b-chat-hf"
+    # "meta-llama/Llama-2-7b-hf"
 )
 
 # Define the list of revisions to match each model (main revision for all models)
