@@ -56,10 +56,45 @@ def update_embed_tokens_and_lm_head(base_model, fine_tuned_model):
 
 
 def main():
-    hf_model_dir = "/projects/llms-lab/merged-models/hf_models"
-    ft_dir = "/projects/llms-lab/merged-models/hf_models"
+    hf_model_dir = "path/to/merged-models/hf_models"
+    ft_dir = "path/to/merged-models/hf_models"
 
     lst = [
+        # Llama 3  + delta 3.1
+        ["llama-3.1-8b-instruct",
+        "llama-3.1-8b",
+        "meta-llama-3-8b",
+        "vec-IT3.1-PT3.1_lambda-1_arc-PT3"],
+        
+
+        # Llama 3.1 + delta 3
+        ["meta-llama-3-8b-instruct",
+        "meta-llama-3-8b",
+        "llama-3.1-8b",
+        "vec-IT3-PT3_lambda-1_arc-PT3.1"],
+        
+
+        # Llama 3 + delta tulu 3   (delta RLVR)
+        ["llama-3.1-tulu-3-8b",
+        "llama-3.1-8b",
+        "meta-llama-3-8b",
+        "vec-ITtulu3-PT3.1_lambda-1_arc-PT3"],
+        
+    
+        # Llama 3 + delta tulu 3.1 (delta GRPO)
+        ["llama-3.1-tulu-3.1-8b",
+        "llama-3.1-8b",
+        "meta-llama-3-8b",
+        "vec-ITtulu3.1-PT3.1_lambda-1_arc-PT3"],
+
+        # OLMo 2 7B + delta OLMo 2 Instruct (delta RLVR)
+        # We use OLMo 2 7B as the base model to avoid creating an identical model.
+        ["olmo-2-1124-7b-instruct",
+        "olmo-2-1124-7b",
+        "olmo-2-1124-7b-stage2-ingredient1-step7000-tokens30b",
+        "vec-SFTolmo2-PTolmo2_lambda-1_arc-PTolmo2-stage2_ingredient1_7k"],
+
+        # M5 + vec-M4
         ["olmo-2-1124-7b-stage2-ingredient1-step6000-tokens26b_ft-tulu3_math_seq-2k_optim-adamw_lr-5e-6_step-30k",
          "olmo-2-1124-7b-stage2-ingredient1-step6000-tokens26b",
          "olmo-2-1124-7b-stage1-step11931-tokens50b",

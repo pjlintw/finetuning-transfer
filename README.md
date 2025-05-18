@@ -74,7 +74,13 @@ cd tools
 python run_transfer_finetuning.py
 ```
 
-You can work this with open-weight models like Llama or Tülu 3—but no need to do fine-tuning by yourself.
+You can use this script with open-weight models like LLaMA or Tülu 3, no need to fine-tune them yourself. We provide several merged model variants in the code:
+
+* LLaMA 3 + Δ_3.1
+* LLaMA 3.1 + Δ_3.0
+* LLaMA 3 + Δ_Tulu-3 (RLVR)
+* LLaMA 3 + Δ_Tulu-3.1 (GRPO)
+* OLMo 2 7K + Δ_OLMo-2-Instruct (RLVR)
 
 
 ### Training
