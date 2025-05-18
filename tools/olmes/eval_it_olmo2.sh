@@ -11,13 +11,26 @@ safe_mkdir() {
             exit 1
         fi
     fi
-}
+}   
 
-MODELS=(
-    # "path/to/allenai/OLMo-2-1124-7B"
+MODELS=(   
+    # Instruction-tuned OLMo2
     # "path/to/allenai/OLMo-2-1124-7B-sft"
     # "path/to/allenai/OLMo-2-1124-7B-dpo"
     "path/to/allenai/OLMo-2-1124-7B-instruct"
+
+    # Instruction-tuned Tulu3
+    # "path/to/llama-3.1-tulu-3-8b-dpo"
+    # "path/to/llama-3.1-tulu-3-8b-sft"
+    # "path/to/llama-3.1-tulu-3-8b"   # instruct version
+    # "path/to/llama-3.1-tulu-3.1-8b" # instruct version
+    
+    ### Example of Recycling fine-tuning using Llama
+    # Llama 3   + delta_3.1
+    # "path/to/vec-IT3.1-IT3_lambda-1_arc-PT3
+    
+    # Llama 3.1 + delta_3
+    # "path/to/vec-IT3-PT3_lambda-1_arc-IT3.1 
 
     ### Example of Recycling fine-tuning using OLMo 2
     # M1 + IT-vector from IT-OLMo2
@@ -42,7 +55,6 @@ MODELS=(
     # FT-M5
     # path/to/olmo-2-1124-7b-stage2-ingredient1-step11931-tokens50b_ft-tulu3_math_seq-2k_optim-adamw_lr-5e-6_step-30k
 
-    
     ### Example of model path in controlled experiments
     # 20 merged models
 
@@ -71,12 +83,11 @@ MODELS=(
     # path/to/vec-FTolmo2_math_30k-PTolmo2-stage1_928k_lambda-1_arc-PTolmo2-stage2_ingredient1_12k
     # path/to/vec-FTolmo2_math_30k-PTolmo2-stage2_ingredient1_6k_lambda-1_arc-PTolmo2-stage2_ingredient1_12k"
 
-
     ### Example of Recycling-then-finetuning
     # Continually training of M5 + vec( M4-FT-30K - M4 )
     
     # path/to/vec-FTolmo2_math_30k-PTolmo2-stage2_ingredient1_6k_lambda-1_arc-PTolmo2-stage2_ingredient1_12k_ft-tulu3_math_seq-2k_optim-adamw_lr-5e-6_step-30k/
-    
+
 )    
 
 

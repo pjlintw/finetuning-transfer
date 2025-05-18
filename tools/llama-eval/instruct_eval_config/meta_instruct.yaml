@@ -1,0 +1,8 @@
+group: meta_instruct
+task:
+- meta_ifeval
+- meta_gpqa_cot
+- meta_math
+- meta_mmlu_instruct
+- meta_gsm8k_8shot_cot
+- meta_arc_challenge_instruct

@@ -7,11 +7,8 @@
   <img src="visuals/recycling_pipeline_fig.jpg" width="520px">
 </div>
 
-**Updates:**
 
-- 2025.03: We released the paper and code.
-
-This repository accompanies the paper (TBA), providing code for all the results.
+Code for "Efficient Model Development through Fine-tuning Transfer".
 
 - [Quick Start](#quick-start)
 - [Transfer Fine-tuning](#transfer-fine-tuning)
@@ -49,7 +46,8 @@ pip install git+https://github.com/huggingface/transformers@6c3f168b36882f0beeba
 
 ## Transfer Fine-tuning
 
-You can transfer fine-tuning updates using only open-weight models (see Section 1 of our paper) or specific fine-tuned models (see Section 4). 
+
+You can transfer fine-tuning updates using only open-weight models or specific fine-tuned models (see Section 4). 
 For example, get the diff between Llama 3.0 Instruct and Llama 3.0, then apply it to Llama 3.1. Or reuse updates from your fine-tuned OLMo 2 model on another base model—no retraining needed.
 
 ### Recycling for Merged Model
@@ -101,13 +99,13 @@ Fine-tuning is done using Open-Instruct on OLMo 2 7B intermediate checkpoints (M
 bash train_math.sh
 ```
 
-
+(Note that it is the exact configuration we use in the paper)
 
 ### Evaluation
 
-We recommend using OLMEs for evaluation, as it provides a standardized and scalable interface—especially for large-scale benchmarks like MMLU.
+#### OLMo, Tülu and base Llama
 
-Our evaluation pipeline uses OLMEs with a VLLM backend that has been modified to support the OLMo2 architecture. For setup instructions, including how to apply the necessary VLLM modifications, see `tools/olmes/olmes_installation_guide` in this repository.
+Our evaluation pipeline uses OLMEs with a VLLM backend that has been modified to support the OLMo2 architecture. For setup instructions, including how to apply the necessary VLLM modifications, see `tools/olmes/olmes_installation_guide` in this repository. We use OLMEs for all OLMo- and Tülu-based models. 
 
 To get started, install OLMEs (we suggest doing this in a separate environment), then run:
 
@@ -117,11 +115,52 @@ cd tools/olmes
 bash eval_it_olmo2.sh
 ```
 
-Note: we're working to release Llama 3 and 3.1 evaluations
+And to run the splits for pre-trained OLMo and Llama pretrained models, run the script:
 
+```bash
+# Run full evaluation for pretrained models
+cd tools/olmes
+bash eval_pt_olmo2.sh
+```
 
+#### instruction-tuned Llama
 
+We follow the official Llama 3 evaluation setup and prompt format for all instruction-tuned Llama models.
 
+To reproduce the results in Table 1 (instruction and merged models), use the evaluation configurations in `tools/llama-eval`. These closely follow the official setup described in the [LLaMA 3 evaluation details](https://github.com/meta-llama/llama-models/blob/main/models/llama3_1/eval_details.md).
 
+##### Installation 
+
+Navigate to the evaluation tool directory:
+
+```bash
+cd tool/llama-eval
+```
+
+We use [llama-cookbook v0.0.4](https://github.com/meta-llama/llama-cookbook/tree/v0.0.4) (previously called llama-receipt). Install the environment by following the official guide: [Reproducing Meta 3.1 Evaluation](https://github.com/meta-llama/llama-cookbook/tree/v0.0.4/tools/benchmarks/llm_eval_harness/meta_eval_reproduce).
+
+##### Setup
+Copy our configuration and evaluation script into the working directory:
+
+```bash
+cp -r instruct_eval_config ./path/to/meta_eval_reproduce/
+cp eval_it_llama.sh ./path/to/meta_eval_reproduce/
+```
+
+Preparing data and running:
+
+```bash
+python prepare_meta_eval.py --config_path ./instruct_eval_config/meta_instruct.yaml
+```
+
+This runs the `meta_instruct.yaml` task group and generates the corresponding `lm_eval` command.
+
+Once the data is ready, run the evaluation script:
+
+```bash
+eval_it_llama.sh
+```
+
+Make sure the include_path in the script points to your actual config directory.
 
 
